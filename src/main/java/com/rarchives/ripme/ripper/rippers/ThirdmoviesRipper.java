@@ -15,12 +15,12 @@ import org.jsoup.select.Elements;
 import com.rarchives.ripme.ripper.AbstractHTMLRipper;
 import com.rarchives.ripme.utils.Http;
 
-public class AnimationscreencapsRipper extends AbstractHTMLRipper {
+public class ThirdmoviesRipper extends AbstractHTMLRipper {
 
-    private static final String DOMAIN = "animationscreencaps.com";
-    private static final String HOST = "animationscreencaps";
+    private static final String DOMAIN = "thirdmovies.com";
+    private static final String HOST = "thirdmovies";
 
-    public AnimationscreencapsRipper(URL url) throws IOException {
+    public ThirdmoviesRipper(URL url) throws IOException {
         super(url);
     }
 
@@ -36,33 +36,38 @@ public class AnimationscreencapsRipper extends AbstractHTMLRipper {
 
     @Override
     public String getGID(URL url) throws MalformedURLException {
-        Pattern p = Pattern.compile("https?://animationscreencaps\\.com/([a-zA-Z0-9_\\-]*)/?$");
+        Pattern p = Pattern.compile("https?://www\\.thirdmovies\\.com/screencaps/([a-zA-Z0-9_\\-]*)/?$");
+        
         Matcher m = p.matcher(url.toExternalForm());
         if (m.matches()) {
             return m.group(1);
         }
-        throw new MalformedURLException("Expected animationscreencaps URL format: "
-                + "animationscreencaps.com/ANIMATION/ - got " + url + " instead");
+        throw new MalformedURLException("Expected thirdmovies URL format: "
+                + "www.thirdmovies.com/screencaps/MOVIENAME/ - got " + url + " instead");
     }
 
     @Override
     public Document getFirstPage() throws IOException {
         // "url" is an instance field of the superclass
-        return Http.url(url).get();
+        // set page size to 300
+        URL newUrl = new URL(url + "?page=1&limit=100");
+        return Http.url(newUrl).get();
     }
 
     @Override
     public Document getNextPage(Document doc) throws IOException {
         // Find next page
-        Element elem = doc.select("div.wp-pagenavi > span.current + a.page").first();
+        Element elem = doc.select("div > ul > li.next_page > a").first();
+        
         if (elem == null) {
             throw new IOException("No more pages");
         }
-        String nextPage = elem.attr("href");
+
+        String nextPage = elem.attr("abs:href");
         // Some times this returns a empty string
-        // This for stops that
-        if (nextPage.equals("")) {
-            return null;
+        // Next page is not deactivated, check if we are actually on the last page
+        if (nextPage.equals("") || doc.location().contains(elem.attr("href"))) {
+            throw new IOException("No more pages");
         } else {
             return Http.url(nextPage).get();
         }
@@ -71,12 +76,12 @@ public class AnimationscreencapsRipper extends AbstractHTMLRipper {
     @Override
     public List<String> getURLsFromPage(Document doc) {
         List<String> result = new ArrayList<>();
-        Elements selector = doc.select("article > section > div > a > img.thumb");
+        Elements selector = doc.select("#section-gallery > div.picture-thumb-block > div.gallerythumb > a");
         //LOGGER.info("Found " + selector.size() + " images");
         for (Element el : selector) {
-            String imageSource = el.attr("src");
-            if (imageSource.contains("wp.com/")) {
-                result.add(imageSource.replace("?w=200&strip=all", ""));
+            String imageSource = el.attr("href");
+            if (imageSource.contains("cdn.thirdmovies.com/")) {
+                result.add(imageSource.split("\\?")[0]);
             }
         }
         return result;
